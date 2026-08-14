@@ -8,17 +8,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
-    --navy:#0b2545;
-    --navy-light:#13355e;
-    --blue:#1d6fd1;
-    --blue-light:#eaf2fd;
+    --navy:#201f1f;
+    --navy-light:#3a3838;
+    --blue:#C00000;
+    --blue-light:#fbe7e7;
     --ink:#1b2430;
     --muted:#6b7688;
     --border:#e2e6ee;
     --bg:#f5f7fb;
     --white:#ffffff;
     --green:#1f9d55;
-    --red:#d3455b;
+    --red:#c0392b;
     --amber:#b8860b;
     --radius:10px;
     --shadow:0 1px 3px rgba(11,37,69,0.08),0 1px 2px rgba(11,37,69,0.06);
@@ -41,11 +41,12 @@
   }
   header .brand{display:flex;align-items:center;gap:12px;}
   header .brand .logo{
-    width:38px;height:38px;border-radius:8px;
-    background:rgba(255,255,255,0.15);
+    width:44px;height:44px;border-radius:8px;
+    background:#ffffff;
     display:flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:15px;letter-spacing:0.5px;
+    padding:5px;
   }
+  header .brand .logo img{width:100%;height:100%;object-fit:contain;display:block;}
   header h1{font-size:18px;margin:0;font-weight:600;}
   header p{margin:2px 0 0;font-size:12.5px;opacity:0.75;}
   main{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
@@ -124,7 +125,7 @@
 
 <header>
   <div class="brand">
-    <div class="logo">LX</div>
+    <div class="logo"><img src="logo.png" alt="Linex Shipping logo" /></div>
     <div>
       <h1>Query Log</h1>
       <p>Linex Shipping — Enquiry &amp; Quotation Number Tracker</p>
