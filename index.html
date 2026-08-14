@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Query Log — Linex Shipping</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#0b2545;
+    --navy-light:#13355e;
+    --blue:#1d6fd1;
+    --blue-light:#eaf2fd;
+    --ink:#1b2430;
+    --muted:#6b7688;
+    --border:#e2e6ee;
+    --bg:#f5f7fb;
+    --white:#ffffff;
+    --green:#1f9d55;
+    --red:#d3455b;
+    --amber:#b8860b;
+    --radius:10px;
+    --shadow:0 1px 3px rgba(11,37,69,0.08),0 1px 2px rgba(11,37,69,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+  }
+  header{
+    background:linear-gradient(135deg,var(--navy),var(--navy-light));
+    color:#fff;
+    padding:22px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:var(--shadow);
+  }
+  header .brand{display:flex;align-items:center;gap:12px;}
+  header .brand .logo{
+    width:38px;height:38px;border-radius:8px;
+    background:rgba(255,255,255,0.15);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:15px;letter-spacing:0.5px;
+  }
+  header h1{font-size:18px;margin:0;font-weight:600;}
+  header p{margin:2px 0 0;font-size:12.5px;opacity:0.75;}
+  main{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
+  .grid{display:grid;grid-template-columns:400px 1fr;gap:20px;align-items:start;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+  .card{
+    background:var(--white);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px;
+  }
+  .card h2{font-size:14.5px;margin:0 0 14px;color:var(--navy);font-weight:600;display:flex;align-items:center;gap:8px;}
+  .card h2 .badge{
+    font-size:10.5px;font-weight:700;color:var(--blue);background:var(--blue-light);
+    padding:2px 8px;border-radius:20px;letter-spacing:0.3px;
+  }
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:12px 0 5px;}
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=number], textarea, select{
+    width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:7px;
+    font-size:13.5px;color:var(--ink);background:#fbfcfe;font-family:inherit;
+  }
+  input:focus, textarea:focus, select:focus{outline:none;border-color:var(--blue);background:#fff;}
+  textarea{resize:vertical;min-height:90px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .drop{
+    border:1.5px dashed var(--border);border-radius:8px;padding:16px;text-align:center;
+    font-size:12.5px;color:var(--muted);cursor:pointer;background:#fbfcfe;transition:.15s;
+  }
+  .drop.drag{border-color:var(--blue);background:var(--blue-light);color:var(--blue);}
+  .drop input{display:none;}
+  .thumb{max-width:100%;max-height:120px;border-radius:6px;margin-top:8px;display:none;}
+  .btn{
+    appearance:none;border:none;border-radius:7px;padding:10px 16px;font-size:13.5px;font-weight:600;
+    cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-primary:hover{background:#1a5fb4;}
+  .btn-ghost{background:var(--blue-light);color:var(--blue);}
+  .btn-ghost:hover{background:#dceafd;}
+  .btn-outline{background:#fff;color:var(--muted);border:1px solid var(--border);}
+  .btn-outline:hover{border-color:var(--blue);color:var(--blue);}
+  .btn:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+  .qno-preview{
+    margin-top:14px;padding:12px 14px;background:var(--navy);color:#fff;border-radius:8px;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:15px;letter-spacing:0.5px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .qno-preview span.tag{font-size:10px;font-family:inherit;opacity:0.65;letter-spacing:0.4px;text-transform:uppercase;}
+  .status{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px;}
+  .status.ok{color:var(--green);}
+  .status.err{color:var(--red);}
+  .status.busy{color:var(--amber);}
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  thead th{
+    text-align:left;padding:10px 10px;background:var(--blue-light);color:var(--navy);
+    font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;
+    position:sticky;top:0;
+  }
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tbody tr:hover{background:#fafbfe;}
+  .qno-cell{font-family:"SF Mono",Menlo,Consolas,monospace;font-weight:700;color:var(--blue);}
+  .table-wrap{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:8px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;}
+  .toolbar input[type=text]{max-width:240px;}
+  .count-pill{font-size:12px;color:var(--muted);}
+  .del-btn{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;font-weight:600;padding:2px 6px;}
+  .del-btn:hover{text-decoration:underline;}
+  .empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px;}
+  footer{text-align:center;font-size:11.5px;color:var(--muted);padding:20px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">LX</div>
+    <div>
+      <h1>Query Log</h1>
+      <p>Linex Shipping — Enquiry &amp; Quotation Number Tracker</p>
+    </div>
+  </div>
+  <div style="font-size:12px;opacity:0.75;" id="todayLabel"></div>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- LEFT: entry form -->
+    <div class="card">
+      <h2>New Enquiry <span class="badge">ENQ</span></h2>
+
+      <label>Paste a screenshot, or drop/select an image</label>
+      <div class="drop" id="dropZone">
+        📎 Click to upload, paste (Ctrl+V), or drag an image here
+        <input type="file" id="fileInput" accept="image/*" />
+        <img class="thumb" id="thumb" />
+      </div>
+      <div class="status" id="ocrStatus"></div>
+
+      <label>Or paste enquiry text</label>
+      <textarea id="rawText" placeholder="Paste the enquiry text here — e.g.&#10;Customer: ABC Traders&#10;Commodity: Machinery Parts&#10;POL: Colombo&#10;POD: Jebel Ali&#10;Containers: 2 x 40HC"></textarea>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-ghost" id="extractBtn">✨ Auto-fill fields from text</button>
+      </div>
+
+      <label>Salesperson (your name)</label>
+      <input type="text" id="salesperson" placeholder="e.g. Kavinda Perera" />
+
+      <label>Customer Name</label>
+      <input type="text" id="customer" placeholder="Customer name" />
+
+      <label>Commodity</label>
+      <input type="text" id="commodity" placeholder="Commodity / cargo description" />
+
+      <div class="row2">
+        <div>
+          <label>Origin / POL</label>
+          <input type="text" id="pol" placeholder="Port of Loading" />
+        </div>
+        <div>
+          <label>Destination / POD</label>
+          <input type="text" id="pod" placeholder="Port of Discharge" />
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>No. of Containers</label>
+          <input type="text" id="numContainers" placeholder="e.g. 2" />
+        </div>
+        <div>
+          <label>Container Type</label>
+          <input type="text" id="containerType" placeholder="e.g. 40HC" />
+        </div>
+      </div>
+
+      <label>Remarks (optional)</label>
+      <textarea id="remarks" style="min-height:50px;" placeholder="Any additional notes"></textarea>
+
+      <div class="qno-preview">
+        <div><span class="tag">Quotation No. (preview)</span><br/><span id="qnoPreview">—</span></div>
+        <button class="btn btn-outline" id="refreshQno" title="Regenerate timestamp">↻</button>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveBtn">💾 Save to Log</button>
+        <button class="btn btn-outline" id="clearBtn">Clear form</button>
+      </div>
+      <div class="status" id="saveStatus"></div>
+    </div>
+
+    <!-- RIGHT: log table -->
+    <div class="card">
+      <h2>Query Log <span class="badge" id="entryCount">0 entries</span></h2>
+      <div class="toolbar">
+        <input type="text" id="searchBox" placeholder="Search by quotation no, customer, salesperson…" />
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" id="exportBtn">⬇ Export to Excel</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="logTable">
+          <thead>
+            <tr>
+              <th>Quotation No.</th>
+              <th>Date / Time</th>
+              <th>Salesperson</th>
+              <th>Customer</th>
+              <th>Commodity</th>
+              <th>POL</th>
+              <th>POD</th>
+              <th>Qty</th>
+              <th>Type</th>
+              <th>Remarks</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+        <div class="empty" id="emptyState">No entries yet. Fill the form on the left and click "Save to Log".</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>Data is stored locally in this browser. Use "Export to Excel" regularly to back up your log.</footer>
+
+<script>
+(function(){
+  "use strict";
+  const STORAGE_KEY = "linex_query_log_entries_v1";
+  const SP_KEY = "linex_query_log_salesperson";
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    dropZone: $("dropZone"), fileInput: $("fileInput"), thumb: $("thumb"), ocrStatus: $("ocrStatus"),
+    rawText: $("rawText"), extractBtn: $("extractBtn"),
+    salesperson: $("salesperson"), customer: $("customer"), commodity: $("commodity"),
+    pol: $("pol"), pod: $("pod"), numContainers: $("numContainers"), containerType: $("containerType"),
+    remarks: $("remarks"), qnoPreview: $("qnoPreview"), refreshQno: $("refreshQno"),
+    saveBtn: $("saveBtn"), clearBtn: $("clearBtn"), saveStatus: $("saveStatus"),
+    logBody: $("logBody"), entryCount: $("entryCount"), searchBox: $("searchBox"),
+    exportBtn: $("exportBtn"), emptyState: $("emptyState"), todayLabel: $("todayLabel")
+  };
+
+  // ---------- date / quotation number ----------
+  function pad2(n){ return String(n).padStart(2,"0"); }
+
+  function timestampParts(d){
+    return { dd: pad2(d.getDate()), mm: pad2(d.getMonth()+1), HH: pad2(d.getHours()), MI: pad2(d.getMinutes()) };
+  }
+
+  function initialsFromName(name){
+    const words = (name||"").trim().split(/\s+/).filter(Boolean);
+    if(words.length === 0) return "XX";
+    if(words.length === 1) return (words[0].slice(0,2)).toUpperCase().padEnd(2,"X");
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  let previewStamp = new Date();
+  function buildQuotationNumber(name, d){
+    const sp = initialsFromName(name);
+    const t = timestampParts(d);
+    return "ENQ" + sp + t.dd + t.mm + t.HH + t.MI;
+  }
+
+  function updatePreview(){
+    els.qnoPreview.textContent = buildQuotationNumber(els.salesperson.value, previewStamp);
+  }
+  els.refreshQno.addEventListener("click", () => { previewStamp = new Date(); updatePreview(); });
+  els.salesperson.addEventListener("input", () => {
+    localStorage.setItem(SP_KEY, els.salesperson.value);
+    updatePreview();
+  });
+  setInterval(() => { previewStamp = new Date(); updatePreview(); }, 15000);
+
+  // ---------- header date ----------
+  function renderTodayLabel(){
+    const d = new Date();
+    els.todayLabel.textContent = d.toLocaleDateString(undefined,{weekday:"long", year:"numeric", month:"long", day:"numeric"});
+  }
+  renderTodayLabel();
+
+  // ---------- restore salesperson ----------
+  const savedSp = localStorage.getItem(SP_KEY);
+  if(savedSp) els.salesperson.value = savedSp;
+  updatePreview();
+
+  // ---------- text extraction (heuristic) ----------
+  const FIELD_PATTERNS = [
+    { key: "customer", regexes: [/customer\s*(name)?\s*[:\-]\s*(.+)/i] },
+    { key: "commodity", regexes: [/commodity\s*[:\-]\s*(.+)/i, /cargo\s*[:\-]\s*(.+)/i, /goods\s*[:\-]\s*(.+)/i] },
+    { key: "pol", regexes: [/(?:origin|pol|port of loading|loading port|from)\s*[:\-]\s*(.+)/i] },
+    { key: "pod", regexes: [/(?:destination|pod|port of discharge|discharge port|to)\s*[:\-]\s*(.+)/i] },
+    { key: "containerType", regexes: [/container\s*type\s*[:\-]\s*(.+)/i] },
+  ];
+
+  function extractFields(text){
+    const result = {};
+    const lines = text.split(/\r?\n/);
+    for(const line of lines){
+      for(const fp of FIELD_PATTERNS){
+        if(result[fp.key]) continue;
+        for(const re of fp.regexes){
+          const m = line.match(re);
+          if(m){ result[fp.key] = (m[2] || m[1]).trim(); break; }
+        }
+      }
+    }
+    // containers, e.g. "2 x 40HC", "2x40'HC", "Containers: 3"
+    const contMatch = text.match(/(\d+)\s*[x×]\s*([0-9]{2,3}\s?'?\s?(?:HC|GP|RF|OT|FR|ST)?)/i);
+    if(contMatch){
+      if(!result.numContainers) result.numContainers = contMatch[1];
+      if(!result.containerType) result.containerType = contMatch[2].replace(/\s+/g,"").toUpperCase();
+    }
+    if(!result.numContainers){
+      const nc = text.match(/(?:no\.?\s*of\s*containers|containers?)\s*[:\-]\s*(\d+)/i);
+      if(nc) result.numContainers = nc[1];
+    }
+    return result;
+  }
+
+  function applyExtracted(fields){
+    if(fields.customer) els.customer.value = fields.customer;
+    if(fields.commodity) els.commodity.value = fields.commodity;
+    if(fields.pol) els.pol.value = fields.pol;
+    if(fields.pod) els.pod.value = fields.pod;
+    if(fields.numContainers) els.numContainers.value = fields.numContainers;
+    if(fields.containerType) els.containerType.value = fields.containerType;
+  }
+
+  els.extractBtn.addEventListener("click", () => {
+    const text = els.rawText.value.trim();
+    if(!text){ setStatus(els.ocrStatus, "Paste some text first.", "err"); return; }
+    const fields = extractFields(text);
+    applyExtracted(fields);
+    setStatus(els.ocrStatus, "Fields auto-filled — please review before saving.", "ok");
+  });
+
+  // ---------- image OCR ----------
+  function setStatus(el, msg, cls){
+    el.textContent = msg;
+    el.className = "status" + (cls ? " " + cls : "");
+  }
+
+  function handleImageFile(file){
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    els.thumb.src = url;
+    els.thumb.style.display = "block";
+    setStatus(els.ocrStatus, "Reading text from image…", "busy");
+    Tesseract.recognize(file, "eng")
+      .then(({ data: { text } }) => {
+        els.rawText.value = text.trim();
+        const fields = extractFields(text);
+        applyExtracted(fields);
+        setStatus(els.ocrStatus, "Text extracted — please review fields before saving.", "ok");
+      })
+      .catch((err) => {
+        console.error(err);
+        setStatus(els.ocrStatus, "Could not read the image. Try pasting the text manually.", "err");
+      });
+  }
+
+  els.dropZone.addEventListener("click", () => els.fileInput.click());
+  els.fileInput.addEventListener("change", (e) => handleImageFile(e.target.files[0]));
+  els.dropZone.addEventListener("dragover", (e) => { e.preventDefault(); els.dropZone.classList.add("drag"); });
+  els.dropZone.addEventListener("dragleave", () => els.dropZone.classList.remove("drag"));
+  els.dropZone.addEventListener("drop", (e) => {
+    e.preventDefault(); els.dropZone.classList.remove("drag");
+    const file = e.dataTransfer.files[0];
+    if(file && file.type.startsWith("image/")) handleImageFile(file);
+  });
+  document.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if(!items) return;
+    for(const item of items){
+      if(item.type.startsWith("image/")){
+        handleImageFile(item.getAsFile());
+        break;
+      }
+    }
+  });
+
+  // ---------- storage ----------
+  function loadEntries(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch(e){ return []; }
+  }
+  function saveEntries(entries){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+
+  let entries = loadEntries();
+
+  function renderTable(filter){
+    const f = (filter || "").trim().toLowerCase();
+    const rows = entries.filter(e => {
+      if(!f) return true;
+      return [e.qno, e.customer, e.salesperson, e.commodity, e.pol, e.pod].join(" ").toLowerCase().includes(f);
+    });
+    els.logBody.innerHTML = "";
+    els.entryCount.textContent = entries.length + " entr" + (entries.length===1?"y":"ies");
+    els.emptyState.style.display = rows.length ? "none" : "block";
+    els.emptyState.textContent = entries.length ? "No entries match your search." : "No entries yet. Fill the form on the left and click \"Save to Log\".";
+
+    for(const e of rows.slice().reverse()){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="qno-cell">${escapeHtml(e.qno)}</td>
+        <td>${escapeHtml(e.dateLabel)}</td>
+        <td>${escapeHtml(e.salesperson)}</td>
+        <td>${escapeHtml(e.customer)}</td>
+        <td>${escapeHtml(e.commodity)}</td>
+        <td>${escapeHtml(e.pol)}</td>
+        <td>${escapeHtml(e.pod)}</td>
+        <td>${escapeHtml(e.numContainers)}</td>
+        <td>${escapeHtml(e.containerType)}</td>
+        <td>${escapeHtml(e.remarks)}</td>
+        <td><button class="del-btn" data-id="${e.id}">Delete</button></td>
+      `;
+      els.logBody.appendChild(tr);
+    }
+    els.logBody.querySelectorAll(".del-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if(!confirm("Delete this log entry?")) return;
+        entries = entries.filter(e => e.id !== btn.dataset.id);
+        saveEntries(entries);
+        renderTable(els.searchBox.value);
+      });
+    });
+  }
+
+  function escapeHtml(str){
+    return String(str || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  els.searchBox.addEventListener("input", () => renderTable(els.searchBox.value));
+
+  // ---------- save ----------
+  els.saveBtn.addEventListener("click", () => {
+    if(!els.salesperson.value.trim()){
+      setStatus(els.saveStatus, "Please enter the salesperson name.", "err");
+      els.salesperson.focus();
+      return;
+    }
+    if(!els.customer.value.trim()){
+      setStatus(els.saveStatus, "Please enter a customer name.", "err");
+      els.customer.focus();
+      return;
+    }
+    const now = new Date();
+    const qno = buildQuotationNumber(els.salesperson.value, now);
+    const entry = {
+      id: qno + "-" + now.getTime(),
+      qno,
+      dateLabel: now.toLocaleDateString() + " " + now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}),
+      isoDate: now.toISOString(),
+      salesperson: els.salesperson.value.trim(),
+      customer: els.customer.value.trim(),
+      commodity: els.commodity.value.trim(),
+      pol: els.pol.value.trim(),
+      pod: els.pod.value.trim(),
+      numContainers: els.numContainers.value.trim(),
+      containerType: els.containerType.value.trim(),
+      remarks: els.remarks.value.trim()
+    };
+    entries.push(entry);
+    saveEntries(entries);
+    renderTable(els.searchBox.value);
+    setStatus(els.saveStatus, "Saved as " + qno, "ok");
+
+    // reset per-entry fields, keep salesperson
+    els.customer.value = ""; els.commodity.value = ""; els.pol.value = ""; els.pod.value = "";
+    els.numContainers.value = ""; els.containerType.value = ""; els.remarks.value = "";
+    els.rawText.value = ""; els.thumb.style.display = "none"; setStatus(els.ocrStatus, "", "");
+    previewStamp = new Date();
+    updatePreview();
+  });
+
+  els.clearBtn.addEventListener("click", () => {
+    els.customer.value = ""; els.commodity.value = ""; els.pol.value = ""; els.pod.value = "";
+    els.numContainers.value = ""; els.containerType.value = ""; els.remarks.value = "";
+    els.rawText.value = ""; els.thumb.style.display = "none";
+    setStatus(els.ocrStatus, ""); setStatus(els.saveStatus, "");
+  });
+
+  // ---------- export ----------
+  els.exportBtn.addEventListener("click", () => {
+    if(!entries.length){ setStatus(els.saveStatus, "No entries to export yet.", "err"); return; }
+    const rows = entries.map(e => ({
+      "Quotation No.": e.qno,
+      "Date/Time": e.dateLabel,
+      "Salesperson": e.salesperson,
+      "Customer Name": e.customer,
+      "Commodity": e.commodity,
+      "Origin/POL": e.pol,
+      "Destination/POD": e.pod,
+      "No. of Containers": e.numContainers,
+      "Container Type": e.containerType,
+      "Remarks": e.remarks
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{wch:16},{wch:16},{wch:16},{wch:20},{wch:20},{wch:14},{wch:14},{wch:10},{wch:12},{wch:26}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Query Log");
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `Query_Log_${stamp}.xlsx`);
+  });
+
+  renderTable("");
+})();
+</script>
+</body>
+</html>
