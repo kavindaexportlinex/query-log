@@ -300,17 +300,20 @@
   updatePreview();
 
   // ---------- text extraction (heuristic) ----------
+  // Pass 1: explicit labeled fields (most reliable when present)
   const FIELD_PATTERNS = [
     { key: "customer", regexes: [/customer\s*(name)?\s*[:\-]\s*(.+)/i] },
     { key: "commodity", regexes: [/commodity\s*[:\-]\s*(.+)/i, /cargo\s*[:\-]\s*(.+)/i, /goods\s*[:\-]\s*(.+)/i] },
-    { key: "pol", regexes: [/(?:origin|pol|port of loading|loading port|from)\s*[:\-]\s*(.+)/i] },
-    { key: "pod", regexes: [/(?:destination|pod|port of discharge|discharge port|to)\s*[:\-]\s*(.+)/i] },
+    { key: "pol", regexes: [/(?:origin|pol|port of loading|loading port)\s*[:\-]\s*(.+)/i] },
+    { key: "pod", regexes: [/(?:destination|pod|port of discharge|discharge port)\s*[:\-]\s*(.+)/i] },
     { key: "containerType", regexes: [/container\s*type\s*[:\-]\s*(.+)/i] },
   ];
 
   function extractFields(text){
     const result = {};
-    const lines = text.split(/\r?\n/);
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    // Pass 1: labeled fields
     for(const line of lines){
       for(const fp of FIELD_PATTERNS){
         if(result[fp.key]) continue;
@@ -320,16 +323,75 @@
         }
       }
     }
-    // containers, e.g. "2 x 40HC", "2x40'HC", "Containers: 3"
-    const contMatch = text.match(/(\d+)\s*[x×]\s*([0-9]{2,3}\s?'?\s?(?:HC|GP|RF|OT|FR|ST)?)/i);
-    if(contMatch){
-      if(!result.numContainers) result.numContainers = contMatch[1];
-      if(!result.containerType) result.containerType = contMatch[2].replace(/\s+/g,"").toUpperCase();
+
+    // Pass 2: container type + quantity, e.g. "2 x 40HC", "40'HC", "20GP"
+    if(!result.containerType || !result.numContainers){
+      const contRe = /(\d+)\s*[x×]\s*(20|40|45)\s*'?\s*(GP|HC|RF|OT|FR|ST|DC)?/i;
+      let m = text.match(contRe);
+      if(m){
+        if(!result.numContainers) result.numContainers = m[1];
+        if(!result.containerType) result.containerType = (m[2] + (m[3] || "GP")).toUpperCase();
+      } else {
+        m = text.match(/\b(20|40|45)\s*'\s*(GP|HC|RF|OT|FR|ST|DC)\b/i) || text.match(/\b(20|40|45)\s*(GP|HC|RF|OT|FR|ST|DC)\b/i);
+        if(m){
+          if(!result.containerType) result.containerType = (m[1] + m[2]).toUpperCase();
+          if(!result.numContainers) result.numContainers = "1";
+        }
+      }
     }
     if(!result.numContainers){
       const nc = text.match(/(?:no\.?\s*of\s*containers|containers?)\s*[:\-]\s*(\d+)/i);
       if(nc) result.numContainers = nc[1];
     }
+
+    // Pass 3: freeform POL/POD — "from X to Y", "rates for/to X", "Ex X"
+    if(!result.pol || !result.pod){
+      const m = text.match(/from\s+([A-Za-z][A-Za-z\s]{1,25}?)\s+to\s+([A-Za-z][A-Za-z\s]{1,25}?)[.\n,;]/i);
+      if(m){
+        if(!result.pol) result.pol = m[1].trim();
+        if(!result.pod) result.pod = m[2].trim();
+      }
+    }
+    if(!result.pod){
+      const m = text.match(/rates?\s+(?:for|to)\s+([A-Za-z][A-Za-z\s]{1,25}?)[.\n,;]/i)
+             || text.match(/rates?\s+(?:for|to)\s+([A-Za-z][A-Za-z\s]{1,25})$/im);
+      if(m) result.pod = m[1].trim();
+    }
+    if(!result.pol){
+      const m = text.match(/\bex[\s-]+([A-Za-z][A-Za-z\s]{1,25}?)[.\n,;]/i);
+      if(m) result.pol = m[1].trim();
+    }
+
+    // Pass 4: commodity fallback — a standalone ALL-CAPS line that isn't a greeting/signature/container/weight line
+    if(!result.commodity){
+      const skip = /^(HI|HELLO|DEAR|KIND REGARDS|REGARDS|BEST REGARDS|THANKS|THANK YOU|REF|SUBJECT)\b/i;
+      for(const line of lines){
+        if(skip.test(line)) continue;
+        if(/^\d/.test(line)) continue;
+        if(/\b(KGS?|KG|MT|TONS?)\b/i.test(line)) continue;
+        if(/\b(20|40|45)\s*'?\s*(GP|HC|RF|OT|FR|ST|DC)?\b/i.test(line) && line.length < 15) continue;
+        if(/^[A-Z][A-Z\s/&\-]{3,40}$/.test(line) && line === line.toUpperCase()){
+          result.commodity = line;
+          break;
+        }
+      }
+    }
+
+    // Pass 5: weight, e.g. "22000 KGS" — noted in remarks, no dedicated field
+    const wMatch = text.match(/(\d[\d,]{2,7})\s*(KGS?|KG|MT|TONS?)\b/i);
+    if(wMatch) result._weightNote = `Weight: ${wMatch[1]} ${wMatch[2].toUpperCase()}`;
+
+    // Pass 6: customer fallback — company-name pattern, else email domain
+    if(!result.customer){
+      const coRe = /([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,4}\s+(?:SHIPPING|LOGISTICS|FORWARDING|LINES?|CARGO|FREIGHT|TRANSPORT|TRADING|ENTERPRISES?|GROUP))/;
+      const m = text.match(coRe);
+      if(m) result.customer = m[1].trim().replace(/\s+/g, " ");
+      else {
+        const em = text.match(/[\w.+-]+@([\w-]+)\.[A-Za-z.]{2,10}/);
+        if(em) result.customer = em[1].charAt(0).toUpperCase() + em[1].slice(1);
+      }
+    }
+
     return result;
   }
 
@@ -340,6 +402,7 @@
     if(fields.pod) els.pod.value = fields.pod;
     if(fields.numContainers) els.numContainers.value = fields.numContainers;
     if(fields.containerType) els.containerType.value = fields.containerType;
+    if(fields._weightNote && !els.remarks.value.trim()) els.remarks.value = fields._weightNote;
   }
 
   els.extractBtn.addEventListener("click", () => {
